@@ -3,3 +3,8 @@ pandas
 requests
 google-auth
 openai
+# Uncomment ONE of the following if appropriate:
+# For local editable install (not processed by most cloud platforms, use during dev):
+# -e ../path/to/langextract
+# For GitHub install (if repo is public and setup.py is correct):
+git+https://github.com/google/langextract.git
