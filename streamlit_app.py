@@ -36,7 +36,7 @@ def get_extractions_from_ai(text, api_key, provider):
                 f"Text:\n{text}\n\nEntities:"
             )
             response = openai.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4",  # <--- use gpt-4, not gpt-3.5-turbo
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
             )
@@ -88,7 +88,6 @@ if st.button("Run") and input_text.strip():
     entities = get_extractions_from_ai(input_text, key, provider)
     extractions = []
     if entities and isinstance(entities, list):
-        # Convert AI output to Extraction objects
         for ent in entities:
             extraction_class = ent.get("type") or ent.get("extraction_class") or "entity"
             extraction_text = ent.get("text") or ent.get("extraction_text") or input_text
@@ -113,7 +112,6 @@ if st.button("Run") and input_text.strip():
                 attributes={}
             )
         ]
-
     examples = [
         ExampleData(
             text=input_text,
@@ -121,15 +119,19 @@ if st.button("Run") and input_text.strip():
         )
     ]
 
-    # Extraction API call -- pass api_key, fence_output, use_schema_constraints for OpenAI
+    # Extraction API call -- pass api_key, model_id, fence_output, use_schema_constraints for OpenAI
     extract_kwargs = dict(examples=examples)
     if provider == "openai":
         extract_kwargs.update({
-            "model_id": "gpt-3.5-turbo",
+            "model_id": "gpt-4",  # <--- use gpt-4
             "api_key": openai_key,
             "fence_output": True,
             "use_schema_constraints": False,
         })
+    elif provider == "gemini":
+        extract_kwargs.update({"model_id": "gemini-pro", "api_key": gemini_key})
+    elif provider == "vertex":
+        extract_kwargs.update({"model_id": "vertex-model", "api_key": vertex_key})
 
     result = lx.extract(input_text, **extract_kwargs)
 
