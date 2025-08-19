@@ -3,5 +3,4 @@ pandas
 requests
 google-auth
 openai
-streamlit-components-v1
 google-langextract
