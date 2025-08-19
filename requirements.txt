@@ -1,5 +1,7 @@
 streamlit
 pandas
+requests
 google-auth
 openai
-requests
+streamlit-components-v1
+google-langextract
