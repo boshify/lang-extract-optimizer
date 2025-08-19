@@ -26,7 +26,7 @@ if st.button("Run") and input_text.strip():
     key = get_api_key()
     
     # --- Extraction & Visualization ---
-    import google.langextract as lx  # Google version, supports provider/api_key
+    import langextract as lx  # <-- Use this import!
 
     # Step 1: Extract entities from input
     result = lx.extract(input_text, api_key=key, provider=selected_api.lower())
@@ -57,7 +57,6 @@ if st.button("Run") and input_text.strip():
     
     # --- Comparison (structured info) ---
     def get_struct_info(result):
-        # Customize to extract rich entity info, e.g. counts, types, attributes
         entities = result.get("entities", [])
         return {
             "Entity Count": len(entities),
@@ -68,9 +67,8 @@ if st.button("Run") and input_text.strip():
     st.write("Original:", get_struct_info(result))
     st.write("Optimized:", get_struct_info(optimized_result))
 
-    # Optionally, display a table or chart to compare metrics
 else:
     st.info("Paste text above and click Run to start.")
 
 st.markdown("---")
-st.caption("Demo for google/langextract: Visualize, optimize, and compare text extracts interactively.")
+st.caption("Demo for langextract: Visualize, optimize, and compare text extracts interactively.")
