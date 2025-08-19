@@ -36,10 +36,10 @@ def get_entities_from_ai(text, api_key, provider):
                 "Return a JSON list of objects, each with 'type' and 'text' fields.\n\n"
                 f"Text:\n{text}\n\nEntities:"
             )
-            response = openai.ChatCompletion.create(
+            response = openai.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
+                temperature=0,
             )
             entities_json_str = response.choices[0].message.content.strip()
             try:
