@@ -98,7 +98,7 @@ if st.button("Run") and input_text.strip():
     examples = [
         ExampleData(
             text=input_text,
-            entities=entities
+            annotations=entities   # <-- changed from entities=entities to annotations=entities
         )
     ]
 
