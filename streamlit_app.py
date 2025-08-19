@@ -26,40 +26,72 @@ def get_entities_from_ai(text, api_key, provider):
     Calls the chosen AI provider to extract entities from the input text.
     Returns a list of dicts: [{"type": ..., "text": ...}, ...]
     """
+    # ---- OpenAI entity extraction ----
     if provider == "openai":
-        import openai
-        openai.api_key = api_key
-        prompt = (
-            "Extract all named entities from the following text. "
-            "Return a JSON list of objects, each with 'type' and 'text' fields.\n\n"
-            f"Text:\n{text}\n\nEntities:"
-        )
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
-        )
-        entities_json_str = response.choices[0].message.content.strip()
-        # Try to find the first valid JSON block in the response
         try:
-            entities = json.loads(entities_json_str)
-        except Exception:
-            entities = []
-        return entities
-
-    # For Gemini or Vertex, you'd need to implement similar logic.
-    # For now, fallback to OpenAI only.
+            import openai
+            openai.api_key = api_key
+            prompt = (
+                "Extract all named entities from the following text. "
+                "Return a JSON list of objects, each with 'type' and 'text' fields.\n\n"
+                f"Text:\n{text}\n\nEntities:"
+            )
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+            )
+            entities_json_str = response.choices[0].message.content.strip()
+            try:
+                # If response is surrounded by code block, strip it
+                if entities_json_str.startswith("```"):
+                    entities_json_str = entities_json_str.split("```")[1].strip()
+                entities = json.loads(entities_json_str)
+            except Exception:
+                entities = []
+            return entities
+        except Exception as e:
+            st.warning(f"OpenAI entity extraction error: {e}")
+            return []
+    # ---- Gemini entity extraction (pseudo) ----
+    elif provider == "gemini":
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            prompt = (
+                "Extract all named entities from the following text. "
+                "Return a JSON list of objects, each with 'type' and 'text' fields.\n\n"
+                f"Text:\n{text}\n\nEntities:"
+            )
+            model = genai.GenerativeModel('gemini-pro')
+            response = model.generate_content(prompt)
+            entities_json_str = response.text.strip()
+            try:
+                if entities_json_str.startswith("```"):
+                    entities_json_str = entities_json_str.split("```")[1].strip()
+                entities = json.loads(entities_json_str)
+            except Exception:
+                entities = []
+            return entities
+        except Exception as e:
+            st.warning(f"Gemini entity extraction error: {e}")
+            return []
+    # ---- Vertex entity extraction (pseudo) ----
+    elif provider == "vertex":
+        st.warning("Vertex AI extraction not implemented in this demo. Falling back to basic example.")
+        return []
+    # ---- fallback ----
     return []
 
 if st.button("Run") and input_text.strip():
     key = get_api_key()
     provider = selected_api.lower()
     import langextract as lx
-    from langextract import ExampleData
+    from langextract.data import ExampleData
 
     # --- Get structured entities from AI provider ---
     entities = get_entities_from_ai(input_text, key, provider)
-    if not entities:
+    if not entities or not isinstance(entities, list):
         st.warning("Could not extract entities using the AI provider. Falling back to treating full text as a single entity.")
         entities = [{"type": "TEXT", "text": input_text}]
 
