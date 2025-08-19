@@ -28,18 +28,23 @@ def get_extractions_from_ai(text, api_key, provider):
     """
     if provider == "openai":
         try:
-            import openai
-            openai.api_key = api_key
+            from openai import OpenAI
+            client = OpenAI(api_key=api_key)
+
             prompt = (
                 "Extract all named entities from the following text. "
-                "Return a JSON list of objects, each with 'type' (entity class), 'text' (entity mention), and 'attributes' (dictionary, optional).\n\n"
+                "Return a JSON list of objects, each with 'type' (entity class), "
+                "'text' (entity mention), and 'attributes' (dictionary, optional).\n\n"
                 f"Text:\n{text}\n\nEntities:"
             )
-            response = openai.chat.completions.create(
-                model="gpt-4",  # <--- use gpt-4, not gpt-3.5-turbo
+
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",  # ✅ updated
+                response_format={"type": "json_object"},
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
             )
+
             entities_json_str = response.choices[0].message.content.strip()
             try:
                 if entities_json_str.startswith("```"):
@@ -57,7 +62,8 @@ def get_extractions_from_ai(text, api_key, provider):
             genai.configure(api_key=api_key)
             prompt = (
                 "Extract all named entities from the following text. "
-                "Return a JSON list of objects, each with 'type' (entity class), 'text' (entity mention), and 'attributes' (dictionary, optional).\n\n"
+                "Return a JSON list of objects, each with 'type' (entity class), "
+                "'text' (entity mention), and 'attributes' (dictionary, optional).\n\n"
                 f"Text:\n{text}\n\nEntities:"
             )
             model = genai.GenerativeModel('gemini-pro')
@@ -123,7 +129,7 @@ if st.button("Run") and input_text.strip():
     extract_kwargs = dict(examples=examples)
     if provider == "openai":
         extract_kwargs.update({
-            "model_id": "gpt-4",  # <--- use gpt-4
+            "model_id": "gpt-4o-mini",   # ✅ updated
             "api_key": openai_key,
             "fence_output": True,
             "use_schema_constraints": False,
