@@ -1,19 +1,15 @@
 import streamlit as st
+import streamlit.components.v1 as components
+import tempfile
 import os
 
-# -- Secret Management --
+# --- Sidebar for secrets ---
 st.sidebar.title("API Keys")
 openai_key = st.sidebar.text_input("OpenAI API Key", type="password")
 gemini_key = st.sidebar.text_input("Gemini API Key", type="password")
 vertex_key = st.sidebar.text_input("Vertex API Key", type="password")
-
 selected_api = st.sidebar.radio("Which API to use?", ["OpenAI", "Gemini", "Vertex"])
-
-api_keys = {
-    "OpenAI": openai_key,
-    "Gemini": gemini_key,
-    "Vertex": vertex_key
-}
+api_keys = {"OpenAI": openai_key, "Gemini": gemini_key, "Vertex": vertex_key}
 
 def get_api_key():
     key = api_keys[selected_api]
@@ -22,59 +18,59 @@ def get_api_key():
         st.stop()
     return key
 
-# -- Input Section --
-st.title("Text Extract Optimizer Demo")
+# --- Main UI ---
+st.title("LangExtract Optimizer & Visualizer Demo")
 input_text = st.text_area("Paste your input text here:", height=240)
 
 if st.button("Run") and input_text.strip():
     key = get_api_key()
     
-    # --- Initial Extraction and Visualization ---
-    def extract_structure(text, key, api):
-        # TODO: Replace with real API call/logic
-        # This is a demo placeholder
-        import hashlib
-        data = {
-            "length": len(text),
-            "unique_words": len(set(text.split())),
-            "hash": hashlib.md5(text.encode()).hexdigest()[:8],
-            "sample_struct": [{"type": "entity", "value": w} for w in set(text.split()[:5])]
-        }
-        return data
-    
-    orig_struct = extract_structure(input_text, key, selected_api)
-    
-    st.subheader("Original Text Structure Visualization")
-    st.json(orig_struct)
-    
-    # --- Auto Optimization ---
-    def optimize_text(text, key, api):
-        # TODO: Replace with actual optimization logic
-        # This is a demo placeholder
-        words = text.split()
-        richer_text = " | ".join(sorted(set(words), key=lambda x: -len(x)))
-        return richer_text
-    
-    optimized_text = optimize_text(input_text, key, selected_api)
-    st.subheader("Auto-Optimized Text")
-    st.text_area("Optimized Text", optimized_text, height=160)
-    
-    opt_struct = extract_structure(optimized_text, key, selected_api)
-    st.subheader("Optimized Text Structure Visualization")
-    st.json(opt_struct)
-    
-    # --- Comparison Visualization ---
-    st.subheader("Comparison of Structured Information")
-    import pandas as pd
-    compare_df = pd.DataFrame({
-        "Metric": ["Length", "Unique Words", "Sample Struct Entities"],
-        "Original": [orig_struct["length"], orig_struct["unique_words"], len(orig_struct["sample_struct"])],
-        "Optimized": [opt_struct["length"], opt_struct["unique_words"], len(opt_struct["sample_struct"])]
-    })
-    st.dataframe(compare_df)
+    # --- Extraction & Visualization ---
+    import google.langextract as lx  # Adjust if your import path differs
 
+    # Step 1: Extract entities from input
+    result = lx.extract(input_text, api_key=key, provider=selected_api.lower())
+    
+    # Step 2: Save annotated extraction to jsonl
+    with tempfile.TemporaryDirectory() as tmpdir:
+        jsonl_path = os.path.join(tmpdir, "orig_extraction.jsonl")
+        lx.io.save_annotated_documents([result], output_name="orig_extraction.jsonl", output_dir=tmpdir)
+        
+        # Step 3: Generate HTML visualization
+        html_content = lx.visualize(jsonl_path)
+        st.subheader("Original Text Visualization")
+        components.html(html_content.data if hasattr(html_content, 'data') else html_content, height=450, scrolling=True)
+    
+    # --- Optimization ---
+    optimized_text = lx.optimize(input_text, api_key=key, provider=selected_api.lower())
+    st.subheader("Optimized Text")
+    st.text_area("Optimized Text Output", optimized_text, height=160)
+    
+    # --- Extract & Visualize Optimized ---
+    optimized_result = lx.extract(optimized_text, api_key=key, provider=selected_api.lower())
+    with tempfile.TemporaryDirectory() as tmpdir2:
+        jsonl_path2 = os.path.join(tmpdir2, "opt_extraction.jsonl")
+        lx.io.save_annotated_documents([optimized_result], output_name="opt_extraction.jsonl", output_dir=tmpdir2)
+        html_content2 = lx.visualize(jsonl_path2)
+        st.subheader("Optimized Text Visualization")
+        components.html(html_content2.data if hasattr(html_content2, 'data') else html_content2, height=450, scrolling=True)
+    
+    # --- Comparison (structured info) ---
+    def get_struct_info(result):
+        # Customize to extract rich entity info, e.g. counts, types, attributes
+        entities = result.get("entities", [])
+        return {
+            "Entity Count": len(entities),
+            "Types": list(set(e["type"] for e in entities)),
+            "Attributes": [e.get("attributes", {}) for e in entities]
+        }
+    st.subheader("Structured Information Comparison")
+    st.write("Original:", get_struct_info(result))
+    st.write("Optimized:", get_struct_info(optimized_result))
+
+    # Optionally, display a table or chart to compare metrics
 else:
     st.info("Paste text above and click Run to start.")
 
 st.markdown("---")
-st.caption("Demo for google/langextract: Visualize, optimize, and compare text extracts.")
+st.caption("Demo for google/langextract: Visualize, optimize, and compare text extracts interactively.")
