@@ -26,10 +26,10 @@ if st.button("Run") and input_text.strip():
     key = get_api_key()
     
     # --- Extraction & Visualization ---
-    import langextract as lx  # <-- Use this import!
+    import langextract as lx  # Use correct import
 
     # Step 1: Extract entities from input
-    result = lx.extract(input_text, api_key=key, provider=selected_api.lower())
+    result = lx.extract(input_text, api_key=key)
     
     # Step 2: Save annotated extraction to jsonl
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -42,12 +42,12 @@ if st.button("Run") and input_text.strip():
         components.html(html_content.data if hasattr(html_content, 'data') else html_content, height=450, scrolling=True)
     
     # --- Optimization ---
-    optimized_text = lx.optimize(input_text, api_key=key, provider=selected_api.lower())
+    optimized_text = lx.optimize(input_text, api_key=key)
     st.subheader("Optimized Text")
     st.text_area("Optimized Text Output", optimized_text, height=160)
     
     # --- Extract & Visualize Optimized ---
-    optimized_result = lx.extract(optimized_text, api_key=key, provider=selected_api.lower())
+    optimized_result = lx.extract(optimized_text, api_key=key)
     with tempfile.TemporaryDirectory() as tmpdir2:
         jsonl_path2 = os.path.join(tmpdir2, "opt_extraction.jsonl")
         lx.io.save_annotated_documents([optimized_result], output_name="opt_extraction.jsonl", output_dir=tmpdir2)
