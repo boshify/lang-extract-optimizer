@@ -3,4 +3,3 @@ pandas
 requests
 google-auth
 openai
-google-langextract
