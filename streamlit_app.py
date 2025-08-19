@@ -21,115 +21,57 @@ def get_api_key():
 st.title("LangExtract Optimizer & Visualizer Demo")
 input_text = st.text_area("Paste your input text here:", height=240)
 
-def get_extractions_from_ai(text, api_key, provider):
-    """
-    Calls the chosen AI provider to extract entities from the input text.
-    Returns a list of dicts: [{"type": ..., "text": ..., "attributes": {...}}, ...]
-    """
-    if provider == "openai":
-        try:
+# ----------------------
+# Optimization Function
+# ----------------------
+def optimize_text(text, api_key, provider):
+    """Rewrite text for SEO and LLM visibility improvement."""
+    prompt = (
+        "Rewrite the following text to improve clarity, structure, and SEO visibility. "
+        "Make it more readable and useful for large language models while preserving meaning. "
+        "Return only the improved text.\n\n"
+        f"Text:\n{text}\n\nImproved Text:"
+    )
+    try:
+        if provider == "openai":
             from openai import OpenAI
             client = OpenAI(api_key=api_key)
-
-            prompt = (
-                "Extract all named entities from the following text. "
-                "Return a JSON list of objects, each with 'type' (entity class), "
-                "'text' (entity mention), and 'attributes' (dictionary, optional).\n\n"
-                f"Text:\n{text}\n\nEntities:"
-            )
-
             response = client.chat.completions.create(
-                model="gpt-4o-mini",  # ✅ updated
-                response_format={"type": "json_object"},
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0,
+                temperature=0.7,
             )
+            return response.choices[0].message.content.strip()
 
-            entities_json_str = response.choices[0].message.content.strip()
-            try:
-                if entities_json_str.startswith("```"):
-                    entities_json_str = entities_json_str.split("```")[1].strip()
-                entities = json.loads(entities_json_str)
-            except Exception:
-                entities = []
-            return entities
-        except Exception as e:
-            st.warning(f"OpenAI entity extraction error: {e}")
-            return []
-    elif provider == "gemini":
-        try:
+        elif provider == "gemini":
             import google.generativeai as genai
             genai.configure(api_key=api_key)
-            prompt = (
-                "Extract all named entities from the following text. "
-                "Return a JSON list of objects, each with 'type' (entity class), "
-                "'text' (entity mention), and 'attributes' (dictionary, optional).\n\n"
-                f"Text:\n{text}\n\nEntities:"
-            )
             model = genai.GenerativeModel('gemini-pro')
             response = model.generate_content(prompt)
-            entities_json_str = response.text.strip()
-            try:
-                if entities_json_str.startswith("```"):
-                    entities_json_str = entities_json_str.split("```")[1].strip()
-                entities = json.loads(entities_json_str)
-            except Exception:
-                entities = []
-            return entities
-        except Exception as e:
-            st.warning(f"Gemini entity extraction error: {e}")
-            return []
-    elif provider == "vertex":
-        st.warning("Vertex AI extraction not implemented in this demo. Falling back to basic example.")
-        return []
-    return []
+            return response.text.strip()
+
+        elif provider == "vertex":
+            return text + "\n\n[Vertex optimization not implemented]"
+        else:
+            return text
+    except Exception as e:
+        st.warning(f"Optimization error: {e}")
+        return text
 
 if st.button("Run") and input_text.strip():
     key = get_api_key()
     provider = selected_api.lower()
+
     import langextract as lx
     from langextract.data import ExampleData, Extraction
 
-    # Get structured entities from AI provider
-    entities = get_extractions_from_ai(input_text, key, provider)
-    extractions = []
-    if entities and isinstance(entities, list):
-        for ent in entities:
-            extraction_class = ent.get("type") or ent.get("extraction_class") or "entity"
-            extraction_text = ent.get("text") or ent.get("extraction_text") or input_text
-            attributes = ent.get("attributes", {})
-            try:
-                extraction = Extraction(
-                    extraction_class=extraction_class,
-                    extraction_text=extraction_text,
-                    attributes=attributes
-                )
-                extractions.append(extraction)
-            except Exception as e:
-                st.warning(f"Error creating Extraction object: {e}")
-        if not extractions:
-            st.warning("AI output could not be converted to Extraction objects. Using fallback.")
-    else:
-        st.warning("Could not extract entities using the AI provider. Falling back to treating full text as a single entity.")
-        extractions = [
-            Extraction(
-                extraction_class="TEXT",
-                extraction_text=input_text,
-                attributes={}
-            )
-        ]
-    examples = [
-        ExampleData(
-            text=input_text,
-            extractions=extractions
-        )
-    ]
-
-    # Extraction API call -- pass api_key, model_id, fence_output, use_schema_constraints for OpenAI
-    extract_kwargs = dict(examples=examples)
+    # ----------------------
+    # Run LangExtract on Original
+    # ----------------------
+    extract_kwargs = {}
     if provider == "openai":
         extract_kwargs.update({
-            "model_id": "gpt-4o-mini",   # ✅ updated
+            "model_id": "gpt-4o-mini",
             "api_key": openai_key,
             "fence_output": True,
             "use_schema_constraints": False,
@@ -141,7 +83,6 @@ if st.button("Run") and input_text.strip():
 
     result = lx.extract(input_text, **extract_kwargs)
 
-    # Save annotated extraction to jsonl
     with tempfile.TemporaryDirectory() as tmpdir:
         jsonl_path = os.path.join(tmpdir, "orig_extraction.jsonl")
         lx.io.save_annotated_documents([result], output_name="orig_extraction.jsonl", output_dir=tmpdir)
@@ -149,13 +90,18 @@ if st.button("Run") and input_text.strip():
         st.subheader("Original Text Visualization")
         components.html(html_content.data if hasattr(html_content, 'data') else html_content, height=450, scrolling=True)
 
-    # Optimization
-    optimized_text = lx.optimize(input_text, examples=examples)
+    # ----------------------
+    # Optimize Text (custom prompt)
+    # ----------------------
+    optimized_text = optimize_text(input_text, key, provider)
     st.subheader("Optimized Text")
     st.text_area("Optimized Text Output", optimized_text, height=160)
 
-    # Extract & Visualize Optimized
+    # ----------------------
+    # Run LangExtract on Optimized Text
+    # ----------------------
     optimized_result = lx.extract(optimized_text, **extract_kwargs)
+
     with tempfile.TemporaryDirectory() as tmpdir2:
         jsonl_path2 = os.path.join(tmpdir2, "opt_extraction.jsonl")
         lx.io.save_annotated_documents([optimized_result], output_name="opt_extraction.jsonl", output_dir=tmpdir2)
@@ -163,30 +109,8 @@ if st.button("Run") and input_text.strip():
         st.subheader("Optimized Text Visualization")
         components.html(html_content2.data if hasattr(html_content2, 'data') else html_content2, height=450, scrolling=True)
 
-    def get_struct_info(res):
-        if hasattr(res, "extractions"):
-            entities = res.extractions or []
-            return {
-                "Entity Count": len(entities),
-                "Types": list(set(getattr(e, "extraction_class", "") for e in entities)),
-                "Attributes": [getattr(e, "attributes", {}) for e in entities]
-            }
-        elif isinstance(res, dict) and "entities" in res:
-            entities = res.get("entities", [])
-            return {
-                "Entity Count": len(entities),
-                "Types": list(set(e.get("type", "") for e in entities)),
-                "Attributes": [e.get("attributes", {}) for e in entities]
-            }
-        else:
-            return {"Entity Count": 0, "Types": [], "Attributes": []}
-
-    st.subheader("Structured Information Comparison")
-    st.write("Original:", get_struct_info(result))
-    st.write("Optimized:", get_struct_info(optimized_result))
-
 else:
     st.info("Paste text above and click Run to start.")
 
 st.markdown("---")
-st.caption("Demo for langextract: Visualize, optimize, and compare text extracts interactively.")
+st.caption("Demo for langextract: Extract, visualize, and optimize text interactively for SEO & LLM visibility.")
