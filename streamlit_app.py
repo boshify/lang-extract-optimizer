@@ -26,8 +26,8 @@ if st.button("Run") and input_text.strip():
     key = get_api_key()
     
     # --- Extraction & Visualization ---
-    import google.langextract as lx  # Adjust if your import path differs
-
+    import langextract as lx  # FIXED: now matches PyPI package
+    
     # Step 1: Extract entities from input
     result = lx.extract(input_text, api_key=key, provider=selected_api.lower())
     
@@ -73,4 +73,4 @@ else:
     st.info("Paste text above and click Run to start.")
 
 st.markdown("---")
-st.caption("Demo for google/langextract: Visualize, optimize, and compare text extracts interactively.")
+st.caption("Demo for langextract: Visualize, optimize, and compare text extracts interactively.")
