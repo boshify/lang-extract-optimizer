@@ -24,9 +24,8 @@ input_text = st.text_area("Paste your input text here:", height=240)
 def get_extractions_from_ai(text, api_key, provider):
     """
     Calls the chosen AI provider to extract entities from the input text.
-    Returns a list of Extraction objects.
+    Returns a list of dicts: [{"type": ..., "text": ..., "attributes": {...}}, ...]
     """
-    # ---- OpenAI entity extraction ----
     if provider == "openai":
         try:
             import openai
@@ -43,7 +42,6 @@ def get_extractions_from_ai(text, api_key, provider):
             )
             entities_json_str = response.choices[0].message.content.strip()
             try:
-                # If response is surrounded by code block, strip it
                 if entities_json_str.startswith("```"):
                     entities_json_str = entities_json_str.split("```")[1].strip()
                 entities = json.loads(entities_json_str)
@@ -53,7 +51,6 @@ def get_extractions_from_ai(text, api_key, provider):
         except Exception as e:
             st.warning(f"OpenAI entity extraction error: {e}")
             return []
-    # ---- Gemini entity extraction (pseudo) ----
     elif provider == "gemini":
         try:
             import google.generativeai as genai
@@ -76,11 +73,9 @@ def get_extractions_from_ai(text, api_key, provider):
         except Exception as e:
             st.warning(f"Gemini entity extraction error: {e}")
             return []
-    # ---- Vertex entity extraction (pseudo) ----
     elif provider == "vertex":
         st.warning("Vertex AI extraction not implemented in this demo. Falling back to basic example.")
         return []
-    # ---- fallback ----
     return []
 
 if st.button("Run") and input_text.strip():
@@ -89,13 +84,12 @@ if st.button("Run") and input_text.strip():
     import langextract as lx
     from langextract.data import ExampleData, Extraction
 
-    # --- Get structured entities from AI provider ---
+    # Get structured entities from AI provider
     entities = get_extractions_from_ai(input_text, key, provider)
     extractions = []
     if entities and isinstance(entities, list):
         # Convert AI output to Extraction objects
         for ent in entities:
-            # Accept both 'type' and 'extraction_class', and 'text' and 'extraction_text'
             extraction_class = ent.get("type") or ent.get("extraction_class") or "entity"
             extraction_text = ent.get("text") or ent.get("extraction_text") or input_text
             attributes = ent.get("attributes", {})
@@ -127,10 +121,19 @@ if st.button("Run") and input_text.strip():
         )
     ]
 
-    # Step 1: Extract entities from input
-    result = lx.extract(input_text, examples=examples)
+    # Extraction API call -- pass api_key, fence_output, use_schema_constraints for OpenAI
+    extract_kwargs = dict(examples=examples)
+    if provider == "openai":
+        extract_kwargs.update({
+            "model_id": "gpt-3.5-turbo",
+            "api_key": openai_key,
+            "fence_output": True,
+            "use_schema_constraints": False,
+        })
 
-    # Step 2: Save annotated extraction to jsonl
+    result = lx.extract(input_text, **extract_kwargs)
+
+    # Save annotated extraction to jsonl
     with tempfile.TemporaryDirectory() as tmpdir:
         jsonl_path = os.path.join(tmpdir, "orig_extraction.jsonl")
         lx.io.save_annotated_documents([result], output_name="orig_extraction.jsonl", output_dir=tmpdir)
@@ -138,13 +141,13 @@ if st.button("Run") and input_text.strip():
         st.subheader("Original Text Visualization")
         components.html(html_content.data if hasattr(html_content, 'data') else html_content, height=450, scrolling=True)
 
-    # --- Optimization ---
+    # Optimization
     optimized_text = lx.optimize(input_text, examples=examples)
     st.subheader("Optimized Text")
     st.text_area("Optimized Text Output", optimized_text, height=160)
 
-    # --- Extract & Visualize Optimized ---
-    optimized_result = lx.extract(optimized_text, examples=examples)
+    # Extract & Visualize Optimized
+    optimized_result = lx.extract(optimized_text, **extract_kwargs)
     with tempfile.TemporaryDirectory() as tmpdir2:
         jsonl_path2 = os.path.join(tmpdir2, "opt_extraction.jsonl")
         lx.io.save_annotated_documents([optimized_result], output_name="opt_extraction.jsonl", output_dir=tmpdir2)
@@ -152,13 +155,24 @@ if st.button("Run") and input_text.strip():
         st.subheader("Optimized Text Visualization")
         components.html(html_content2.data if hasattr(html_content2, 'data') else html_content2, height=450, scrolling=True)
 
-    def get_struct_info(result):
-        entities = result.get("entities", [])
-        return {
-            "Entity Count": len(entities),
-            "Types": list(set(e.get("type", "") for e in entities)),
-            "Attributes": [e.get("attributes", {}) for e in entities]
-        }
+    def get_struct_info(res):
+        if hasattr(res, "extractions"):
+            entities = res.extractions or []
+            return {
+                "Entity Count": len(entities),
+                "Types": list(set(getattr(e, "extraction_class", "") for e in entities)),
+                "Attributes": [getattr(e, "attributes", {}) for e in entities]
+            }
+        elif isinstance(res, dict) and "entities" in res:
+            entities = res.get("entities", [])
+            return {
+                "Entity Count": len(entities),
+                "Types": list(set(e.get("type", "") for e in entities)),
+                "Attributes": [e.get("attributes", {}) for e in entities]
+            }
+        else:
+            return {"Entity Count": 0, "Types": [], "Attributes": []}
+
     st.subheader("Structured Information Comparison")
     st.write("Original:", get_struct_info(result))
     st.write("Optimized:", get_struct_info(optimized_result))
