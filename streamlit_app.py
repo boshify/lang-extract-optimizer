@@ -26,10 +26,11 @@ if st.button("Run") and input_text.strip():
     key = get_api_key()
     
     # --- Extraction & Visualization ---
-    import langextract as lx  # FIXED: now matches PyPI package
+    import langextract as lx  # Updated: use PyPI package
     
     # Step 1: Extract entities from input
-    result = lx.extract(input_text, api_key=key, provider=selected_api.lower())
+    # NOTE: The PyPI version does not support 'provider' or 'api_key'
+    result = lx.extract(input_text)
     
     # Step 2: Save annotated extraction to jsonl
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -42,12 +43,12 @@ if st.button("Run") and input_text.strip():
         components.html(html_content.data if hasattr(html_content, 'data') else html_content, height=450, scrolling=True)
     
     # --- Optimization ---
-    optimized_text = lx.optimize(input_text, api_key=key, provider=selected_api.lower())
+    optimized_text = lx.optimize(input_text)
     st.subheader("Optimized Text")
     st.text_area("Optimized Text Output", optimized_text, height=160)
     
     # --- Extract & Visualize Optimized ---
-    optimized_result = lx.extract(optimized_text, api_key=key, provider=selected_api.lower())
+    optimized_result = lx.extract(optimized_text)
     with tempfile.TemporaryDirectory() as tmpdir2:
         jsonl_path2 = os.path.join(tmpdir2, "opt_extraction.jsonl")
         lx.io.save_annotated_documents([optimized_result], output_name="opt_extraction.jsonl", output_dir=tmpdir2)
@@ -61,7 +62,7 @@ if st.button("Run") and input_text.strip():
         entities = result.get("entities", [])
         return {
             "Entity Count": len(entities),
-            "Types": list(set(e["type"] for e in entities)),
+            "Types": list(set(e["type"] for e in entities if "type" in e)),
             "Attributes": [e.get("attributes", {}) for e in entities]
         }
     st.subheader("Structured Information Comparison")
