@@ -3,4 +3,4 @@ pandas
 requests
 google-auth
 openai
-langextract
+git+https://github.com/google/langextract.git
