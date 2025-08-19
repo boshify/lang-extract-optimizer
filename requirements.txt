@@ -1,2 +1,5 @@
 streamlit
-os
+pandas
+google-auth
+openai
+requests
