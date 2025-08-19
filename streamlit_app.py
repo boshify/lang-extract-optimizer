@@ -21,10 +21,10 @@ def get_api_key():
 st.title("LangExtract Optimizer & Visualizer Demo")
 input_text = st.text_area("Paste your input text here:", height=240)
 
-def get_entities_from_ai(text, api_key, provider):
+def get_extractions_from_ai(text, api_key, provider):
     """
     Calls the chosen AI provider to extract entities from the input text.
-    Returns a list of dicts: [{"type": ..., "text": ...}, ...]
+    Returns a list of Extraction objects.
     """
     # ---- OpenAI entity extraction ----
     if provider == "openai":
@@ -33,7 +33,7 @@ def get_entities_from_ai(text, api_key, provider):
             openai.api_key = api_key
             prompt = (
                 "Extract all named entities from the following text. "
-                "Return a JSON list of objects, each with 'type' and 'text' fields.\n\n"
+                "Return a JSON list of objects, each with 'type' (entity class), 'text' (entity mention), and 'attributes' (dictionary, optional).\n\n"
                 f"Text:\n{text}\n\nEntities:"
             )
             response = openai.chat.completions.create(
@@ -60,7 +60,7 @@ def get_entities_from_ai(text, api_key, provider):
             genai.configure(api_key=api_key)
             prompt = (
                 "Extract all named entities from the following text. "
-                "Return a JSON list of objects, each with 'type' and 'text' fields.\n\n"
+                "Return a JSON list of objects, each with 'type' (entity class), 'text' (entity mention), and 'attributes' (dictionary, optional).\n\n"
                 f"Text:\n{text}\n\nEntities:"
             )
             model = genai.GenerativeModel('gemini-pro')
@@ -87,18 +87,43 @@ if st.button("Run") and input_text.strip():
     key = get_api_key()
     provider = selected_api.lower()
     import langextract as lx
-    from langextract.data import ExampleData
+    from langextract.data import ExampleData, Extraction
 
     # --- Get structured entities from AI provider ---
-    entities = get_entities_from_ai(input_text, key, provider)
-    if not entities or not isinstance(entities, list):
+    entities = get_extractions_from_ai(input_text, key, provider)
+    extractions = []
+    if entities and isinstance(entities, list):
+        # Convert AI output to Extraction objects
+        for ent in entities:
+            # Accept both 'type' and 'extraction_class', and 'text' and 'extraction_text'
+            extraction_class = ent.get("type") or ent.get("extraction_class") or "entity"
+            extraction_text = ent.get("text") or ent.get("extraction_text") or input_text
+            attributes = ent.get("attributes", {})
+            try:
+                extraction = Extraction(
+                    extraction_class=extraction_class,
+                    extraction_text=extraction_text,
+                    attributes=attributes
+                )
+                extractions.append(extraction)
+            except Exception as e:
+                st.warning(f"Error creating Extraction object: {e}")
+        if not extractions:
+            st.warning("AI output could not be converted to Extraction objects. Using fallback.")
+    else:
         st.warning("Could not extract entities using the AI provider. Falling back to treating full text as a single entity.")
-        entities = [{"type": "TEXT", "text": input_text}]
+        extractions = [
+            Extraction(
+                extraction_class="TEXT",
+                extraction_text=input_text,
+                attributes={}
+            )
+        ]
 
     examples = [
         ExampleData(
             text=input_text,
-            annotations=entities   # <-- changed from entities=entities to annotations=entities
+            extractions=extractions
         )
     ]
 
